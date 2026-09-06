@@ -14,6 +14,8 @@ public class BottleSpawner : MonoBehaviour
     [Min(0.25f)] public float interval = 2.5f;
     [Range(0f, 1f)] public float defectRate = 0.4f;
     public int maxLiveItems = 12;
+    [Tooltip("Spawned bottles are scaled to roughly this height in metres.")]
+    public float itemHeight = 0.22f;
 
     [Header("Inspection photos (real bottle-cap images)")]
     public Texture2D[] correctImages;
@@ -48,6 +50,7 @@ public class BottleSpawner : MonoBehaviour
     void Spawn()
     {
         var go = Instantiate(bottlePrefab, belt.PositionAt(0f), belt.Facing, transform);
+        NormalizeHeight(go);
         var it = go.GetComponent<ProductItem>();
         if (!it) it = go.AddComponent<ProductItem>();
 
@@ -72,4 +75,14 @@ public class BottleSpawner : MonoBehaviour
 
     static Texture2D Pick(Texture2D[] arr) =>
         (arr != null && arr.Length > 0) ? arr[Random.Range(0, arr.Length)] : null;
+
+    void NormalizeHeight(GameObject go)
+    {
+        if (itemHeight <= 0f) return;
+        var rends = go.GetComponentsInChildren<Renderer>();
+        if (rends.Length == 0) return;
+        var b = rends[0].bounds;
+        for (int i = 1; i < rends.Length; i++) b.Encapsulate(rends[i].bounds);
+        if (b.size.y > 1e-4f) go.transform.localScale *= itemHeight / b.size.y;
+    }
 }

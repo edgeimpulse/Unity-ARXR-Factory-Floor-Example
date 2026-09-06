@@ -36,6 +36,7 @@ public class InspectionStation : MonoBehaviour
         }
 
         item.flaggedDefect = defect;
+        Tint(item, defect ? new Color(0.95f, 0.35f, 0.35f) : new Color(0.4f, 0.9f, 0.5f));
 
         if (monitorImage && item.inspectionImage) monitorImage.texture = item.inspectionImage;
         if (verdictText)
@@ -44,5 +45,15 @@ public class InspectionStation : MonoBehaviour
             verdictText.color = defect ? new Color(0.9f, 0.2f, 0.2f) : new Color(0.2f, 0.8f, 0.3f);
         }
         if (hud) hud.Record(defect);
+    }
+
+    static void Tint(ProductItem item, Color c)
+    {
+        foreach (var r in item.GetComponentsInChildren<Renderer>())
+        {
+            var m = r.material;
+            if (m.HasProperty("_BaseColor")) m.SetColor("_BaseColor", c);
+            if (m.HasProperty("_Color")) m.SetColor("_Color", c);
+        }
     }
 }
