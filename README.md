@@ -20,6 +20,9 @@ line (the bottle "breaks"), while **`cap_correct`** bottles pass through.
 - Task: object detection (FOMO)
 - Labels: `cap_correct`, `cap_incorrect`
 
+  <img width="768" height="732" alt="image" src="https://github.com/user-attachments/assets/cc13d0ce-6b17-45f8-92aa-0353cfc49d0f" />
+
+
 The model is deployed as a **C++ library** and compiled to a native plugin for each
 target platform. See Edge Impulse's
 [Deploy your model as a C++ library](https://docs.edgeimpulse.com/docs/deploy-your-model-as-a-c-library).
