@@ -78,3 +78,13 @@ Thumbs.db
 .ei-api-key
 ei-api-key.txt
 secrets.*
+
+# ---------------------------------------------------------------------------
+# Edge Impulse native SDK — regenerate with native/fetch_model.sh (too large /
+# generated). The compiled plugins in Assets/Plugins/ ARE committed.
+# ---------------------------------------------------------------------------
+native/edge-impulse-sdk/
+native/model-parameters/
+native/tflite-model/
+native/build/
+native/**/*.o

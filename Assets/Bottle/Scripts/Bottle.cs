@@ -5,19 +5,16 @@ using UnityEngine;
 public class Bottle : MonoBehaviour
 {
     [SerializeField] GameObject brokenBottlePrefab;
-    
-    void Update() // just for testing
+
+    /// Shatters the bottle into its broken pieces and removes the intact bottle.
+    public void Explode()
     {
-        if(Input.GetKeyDown(KeyCode.K))
+        if (brokenBottlePrefab)
         {
-            Explode();
+            GameObject brokenBottle = Instantiate(brokenBottlePrefab, transform.position, transform.rotation);
+            var bb = brokenBottle.GetComponent<BrokenBottle>();
+            if (bb) bb.RandomVelocities();
         }
-    }
-    
-    void Explode()
-    {
-        GameObject brokenBottle = Instantiate(brokenBottlePrefab, this.transform.position, Quaternion.identity);
-        brokenBottle.GetComponent<BrokenBottle>().RandomVelocities();
         Destroy(gameObject);
     }
 }
