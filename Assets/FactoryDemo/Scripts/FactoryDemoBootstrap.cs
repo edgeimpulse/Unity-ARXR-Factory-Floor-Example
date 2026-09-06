@@ -14,16 +14,18 @@ public class FactoryDemoBootstrap : MonoBehaviour
     public float distanceInFront = 2.6f;
     [Tooltip("If set, the belt is placed relative to this transform instead of the main camera.")]
     public Transform placeRelativeTo;
+    [Tooltip("When true (and no placeRelativeTo) the belt is placed in front of the main camera; when false it uses a fixed world position.")]
+    public bool placeInFrontOfCamera = true;
 
     [Header("Tuning")]
-    public float beltSpeed = 0.35f;
-    public float spawnInterval = 2.0f;
+    public float beltSpeed = 0.7f;
+    public float spawnInterval = 1.0f;
     [Range(0f, 1f)] public float defectRate = 0.5f;
     [Range(0f, 1f)] public float threshold = 0.5f;
 
     void Start()
     {
-        Transform anchor = placeRelativeTo ? placeRelativeTo : (Camera.main ? Camera.main.transform : null);
+        Transform anchor = placeRelativeTo ? placeRelativeTo : (placeInFrontOfCamera && Camera.main ? Camera.main.transform : null);
 
         Vector3 center;
         Vector3 right, faceDir;
@@ -52,7 +54,12 @@ public class FactoryDemoBootstrap : MonoBehaviour
         belt.transform.localScale = new Vector3(beltLength, 0.06f, 0.5f);
         belt.transform.rotation = beltRot;
         var beltRenderer = belt.GetComponent<Renderer>();
-        beltRenderer.material = MakeMaterial(new Color(0.12f, 0.12f, 0.14f));
+        var beltMat = MakeMaterial(new Color(0.16f, 0.17f, 0.2f));
+        var stripes = MakeStripeTexture();
+        if (beltMat.HasProperty("_BaseMap")) beltMat.SetTexture("_BaseMap", stripes);
+        beltMat.mainTexture = stripes;
+        beltMat.mainTextureScale = new Vector2(Mathf.Max(2f, Mathf.Round(beltLength * 6f)), 2f);
+        beltRenderer.material = beltMat;
         Destroy(belt.GetComponent<Collider>());
 
         var legs = GameObject.CreatePrimitive(PrimitiveType.Cube);
@@ -71,15 +78,34 @@ public class FactoryDemoBootstrap : MonoBehaviour
         exit.SetParent(root, false);
         exit.position = center + right * (beltLength * 0.5f) + Vector3.up * 0.06f;
 
-        // inspection marker (a scanning gantry over the belt)
-        var gantry = GameObject.CreatePrimitive(PrimitiveType.Cube);
-        gantry.name = "InspectionGantry";
-        gantry.transform.SetParent(root, false);
-        gantry.transform.localScale = new Vector3(0.05f, 0.5f, 0.6f);
-        gantry.transform.position = Vector3.Lerp(spawn.position, exit.position, 0.55f) + Vector3.up * 0.25f;
-        gantry.transform.rotation = beltRot;
-        gantry.GetComponent<Renderer>().material = MakeMaterial(new Color(0.9f, 0.6f, 0.1f));
-        Destroy(gantry.GetComponent<Collider>());
+        // inspection gantry: two posts + a top beam with a red scan light
+        Vector3 insCenter = Vector3.Lerp(spawn.position, exit.position, 0.55f);
+        var beam = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        beam.name = "ScannerBeam"; beam.transform.SetParent(root, false);
+        beam.transform.localScale = new Vector3(0.08f, 0.08f, 0.72f);
+        beam.transform.rotation = beltRot;
+        beam.transform.position = insCenter + Vector3.up * 0.44f;
+        beam.GetComponent<Renderer>().material = MakeMaterial(new Color(0.82f, 0.85f, 0.9f));
+        Destroy(beam.GetComponent<Collider>());
+        for (int s = -1; s <= 1; s += 2)
+        {
+            var post = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            post.name = "ScannerPost"; post.transform.SetParent(root, false);
+            post.transform.localScale = new Vector3(0.06f, 0.46f, 0.06f);
+            post.transform.rotation = beltRot;
+            post.transform.position = insCenter + Vector3.up * 0.22f + beltRot * new Vector3(0f, 0f, s * 0.33f);
+            post.GetComponent<Renderer>().material = MakeMaterial(new Color(0.3f, 0.32f, 0.36f));
+            Destroy(post.GetComponent<Collider>());
+        }
+        var scan = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        scan.name = "ScanLight"; scan.transform.SetParent(root, false);
+        scan.transform.localScale = new Vector3(0.05f, 0.02f, 0.66f);
+        scan.transform.rotation = beltRot;
+        scan.transform.position = insCenter + Vector3.up * 0.38f;
+        var scanMat = MakeMaterial(new Color(1f, 0.25f, 0.2f));
+        if (scanMat.HasProperty("_EmissionColor")) { scanMat.EnableKeyword("_EMISSION"); scanMat.SetColor("_EmissionColor", new Color(1f, 0.15f, 0.1f) * 2.5f); }
+        scan.GetComponent<Renderer>().material = scanMat;
+        Destroy(scan.GetComponent<Collider>());
 
         // --- conveyor logic --------------------------------------------------------
         var belted = root.gameObject.AddComponent<ConveyorBelt>();
@@ -101,7 +127,8 @@ public class FactoryDemoBootstrap : MonoBehaviour
         var crt = canvas.GetComponent<RectTransform>();
         crt.sizeDelta = new Vector2(640, 360);
         canvasGO.transform.position = center + Vector3.up * 0.75f - faceDir * 0.05f;
-        canvasGO.transform.rotation = Quaternion.LookRotation(faceDir, Vector3.up);
+        var camForCanvas = Camera.main ? Camera.main.transform.position : center - faceDir * 3f;
+        canvasGO.transform.rotation = Quaternion.LookRotation((canvasGO.transform.position - camForCanvas).normalized, Vector3.up);
         canvasGO.transform.localScale = Vector3.one * 0.0016f;
 
         var panel = new GameObject("Panel").AddComponent<Image>();
@@ -111,6 +138,8 @@ public class FactoryDemoBootstrap : MonoBehaviour
 
         var monitor = new GameObject("Monitor").AddComponent<RawImage>();
         monitor.transform.SetParent(canvasGO.transform, false);
+        monitor.color = Color.white;
+        monitor.texture = MakeSolidTexture(new Color(0.1f, 0.11f, 0.14f));
         monitor.rectTransform.sizeDelta = new Vector2(300, 300);
         monitor.rectTransform.anchoredPosition = new Vector2(-150, 0);
 
@@ -159,6 +188,33 @@ public class FactoryDemoBootstrap : MonoBehaviour
         if (m.HasProperty("_BaseColor")) m.SetColor("_BaseColor", c);
         if (m.HasProperty("_Color")) m.SetColor("_Color", c);
         return m;
+    }
+
+    static Texture2D MakeStripeTexture()
+    {
+        const int n = 16;
+        var t = new Texture2D(n, 2);
+        var a = new Color(0.13f, 0.14f, 0.17f);
+        var b = new Color(0.22f, 0.23f, 0.27f);
+        for (int x = 0; x < n; x++)
+        {
+            var c = (x % 4 < 2) ? a : b;
+            t.SetPixel(x, 0, c); t.SetPixel(x, 1, c);
+        }
+        t.wrapMode = TextureWrapMode.Repeat;
+        t.filterMode = FilterMode.Point;
+        t.Apply();
+        return t;
+    }
+
+    static Texture2D MakeSolidTexture(Color c)
+    {
+        var t = new Texture2D(4, 4);
+        var px = new Color[16];
+        for (int i = 0; i < px.Length; i++) px[i] = c;
+        t.SetPixels(px);
+        t.Apply();
+        return t;
     }
 
     static void StretchFull(RectTransform rt)

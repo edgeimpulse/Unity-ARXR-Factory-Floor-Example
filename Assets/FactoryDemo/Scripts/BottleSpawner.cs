@@ -15,7 +15,7 @@ public class BottleSpawner : MonoBehaviour
     [Range(0f, 1f)] public float defectRate = 0.4f;
     public int maxLiveItems = 12;
     [Tooltip("Spawned bottles are scaled to roughly this height in metres.")]
-    public float itemHeight = 0.22f;
+    public float itemHeight = 0.4f;
 
     [Header("Inspection photos (real bottle-cap images)")]
     public Texture2D[] correctImages;
@@ -23,6 +23,7 @@ public class BottleSpawner : MonoBehaviour
 
     readonly List<ProductItem> items = new List<ProductItem>();
     float timer;
+    int spawnCount;
 
     void Update()
     {
@@ -40,6 +41,7 @@ public class BottleSpawner : MonoBehaviour
             if (!it.inspected && it.progress >= belt.inspectAt && inspection)
                 inspection.Inspect(it);
 
+            if (it.flaggedDefect && it.progress >= 0.72f) { Retire(it); items.RemoveAt(i); continue; }
             if (it.progress >= 1f) { Retire(it); items.RemoveAt(i); }
         }
 
@@ -49,12 +51,13 @@ public class BottleSpawner : MonoBehaviour
 
     void Spawn()
     {
-        var go = Instantiate(bottlePrefab, belt.PositionAt(0f), belt.Facing, transform);
+        var go = Instantiate(bottlePrefab, belt.PositionAt(0f), Quaternion.identity, transform);
+        foreach (var rb in go.GetComponentsInChildren<Rigidbody>()) rb.isKinematic = true; // moved by script; don't topple
         NormalizeHeight(go);
         var it = go.GetComponent<ProductItem>();
         if (!it) it = go.AddComponent<ProductItem>();
 
-        bool defect = Random.value < defectRate;
+        bool defect = (spawnCount++ % 2) == 1; // alternate pass/reject for a clear demo
         it.defectGroundTruth = defect;
         it.inspectionImage = Pick(defect ? defectImages : correctImages);
         it.progress = 0f;

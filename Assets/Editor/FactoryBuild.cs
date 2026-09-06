@@ -50,6 +50,9 @@ public static class FactoryBuild
     public static void BuildMacCapture()
     {
         PlayerSettings.SetScriptingBackend(NamedBuildTarget.Standalone, ScriptingImplementation.Mono2x);
+        PlayerSettings.runInBackground = true;
+        try { UnityEditor.OSXStandalone.UserBuildSettings.architecture = UnityEditor.Build.OSArchitecture.ARM64; }
+        catch (System.Exception e) { Debug.LogWarning("FactoryBuild: could not set mac arch: " + e.Message); }
         Directory.CreateDirectory("build/Mac");
         var options = new BuildPlayerOptions
         {

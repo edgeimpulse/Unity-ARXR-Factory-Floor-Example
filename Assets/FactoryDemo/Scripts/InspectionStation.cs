@@ -41,7 +41,7 @@ public class InspectionStation : MonoBehaviour
         if (monitorImage && item.inspectionImage) monitorImage.texture = item.inspectionImage;
         if (verdictText)
         {
-            verdictText.text = defect ? $"REJECT  {label}  {conf:P0}" : $"PASS  {label}  {conf:P0}";
+            verdictText.text = defect ? $"REJECT  {conf:P0}" : "PASS";
             verdictText.color = defect ? new Color(0.9f, 0.2f, 0.2f) : new Color(0.2f, 0.8f, 0.3f);
         }
         if (hud) hud.Record(defect);

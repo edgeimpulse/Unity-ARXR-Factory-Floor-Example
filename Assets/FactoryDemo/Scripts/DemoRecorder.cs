@@ -6,9 +6,9 @@ using UnityEngine;
 /// Enabled only in the dedicated capture scene.
 public class DemoRecorder : MonoBehaviour
 {
-    public int width = 640;
-    public int height = 360;
-    public int frames = 240;      // at captureFramerate 30 => 8 seconds
+    public int width = 960;
+    public int height = 540;
+    public int frames = 270;      // at captureFramerate 30 => 9 seconds
     public int captureFramerate = 30;
     public int randomSeed = 4242;
     public string outputDir = "";
@@ -22,6 +22,7 @@ public class DemoRecorder : MonoBehaviour
     {
         Random.InitState(randomSeed);
         Time.captureFramerate = captureFramerate;
+        Application.runInBackground = true; // render at full speed even when unfocused
 
         cam = Camera.main;
         rt = new RenderTexture(width, height, 24);

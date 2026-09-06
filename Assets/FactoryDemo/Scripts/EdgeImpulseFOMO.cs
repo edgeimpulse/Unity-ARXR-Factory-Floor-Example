@@ -68,8 +68,41 @@ public static class EdgeImpulseFOMO
 
     static byte[] ToRgb(Texture2D src, int w, int h)
     {
-        var rt = RenderTexture.GetTemporary(w, h, 0, RenderTextureFormat.ARGB32);
-        Graphics.Blit(src, rt);
+        // Read the raw sRGB bytes (GetPixels32) and resize on the CPU. This avoids
+        // the linear<->sRGB conversion that Graphics.Blit/ReadPixels applies in a
+        // Linear-colour-space project, which would feed the model gamma-wrong pixels.
+        Color32[] px;
+        try { px = src.GetPixels32(); }
+        catch { return ToRgbViaBlit(src, w, h); }
+
+        int sw = src.width, sh = src.height;
+        int side = Mathf.Min(sw, sh);
+        int ox = (sw - side) / 2;
+        int oy = (sh - side) / 2;
+        var outb = new byte[w * h * 3];
+        for (int y = 0; y < h; y++)
+        {
+            // GetPixels32 is bottom-up; Edge Impulse wants top-down.
+            int sRow = oy + side - 1 - Mathf.Clamp((int)((y + 0.5f) * side / h), 0, side - 1);
+            for (int x = 0; x < w; x++)
+            {
+                int sCol = ox + Mathf.Clamp((int)((x + 0.5f) * side / w), 0, side - 1);
+                var c = px[sRow * sw + sCol];
+                int o = (y * w + x) * 3;
+                outb[o] = c.r; outb[o + 1] = c.g; outb[o + 2] = c.b;
+            }
+        }
+        return outb;
+    }
+
+    // Fallback for non-readable textures (e.g. a live camera RenderTexture).
+    static byte[] ToRgbViaBlit(Texture2D src, int w, int h)
+    {
+        var rt = RenderTexture.GetTemporary(w, h, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
+        float side = Mathf.Min(src.width, src.height);
+        var scale = new Vector2(side / src.width, side / src.height);
+        var offset = new Vector2((1f - scale.x) * 0.5f, (1f - scale.y) * 0.5f);
+        Graphics.Blit(src, rt, scale, offset);
         var prev = RenderTexture.active;
         RenderTexture.active = rt;
         var tmp = new Texture2D(w, h, TextureFormat.RGB24, false);

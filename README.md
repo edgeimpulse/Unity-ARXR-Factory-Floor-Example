@@ -9,9 +9,12 @@ Bottles travel along a conveyor. A virtual inspection camera runs an Edge Impuls
 classified as **`cap_incorrect`** are flagged as defective and removed from the
 line (the bottle "breaks"), while **`cap_correct`** bottles pass through.
 
-> Status: **work in progress.** The Unity project, factory/conveyor assets and the
-> bottle logic are in place. On-device Edge Impulse inference (macOS Editor for the
-> simulator + Android arm64 for the headset) is being wired in.
+![The conveyor inspection demo](docs/media/factory-demo.gif)
+
+> **Working demo.** On-device Edge Impulse inference runs both in the Unity Editor
+> (the XR simulator) and on the Quest 3 / 3S. Download the
+> [APK from Releases](https://github.com/edgeimpulse/Unity-ARXR-Factory-Floor-Example/releases)
+> to try it on a headset, or follow the step-by-step [tutorial](docs/TUTORIAL.md).
 
 ## Edge Impulse model
 

@@ -22,12 +22,12 @@ public static class FactorySceneBuilder
         var camGO = new GameObject("Main Camera");
         camGO.tag = "MainCamera";
         var cam = camGO.AddComponent<Camera>();
-        cam.fieldOfView = 60f;
+        cam.fieldOfView = 50f;
         cam.clearFlags = CameraClearFlags.Skybox;
         cam.backgroundColor = new Color(0.05f, 0.06f, 0.08f);
         camGO.AddComponent<AudioListener>();
-        camGO.transform.position = new Vector3(0f, 1.4f, -0.2f);
-        camGO.transform.rotation = Quaternion.Euler(8f, 0f, 0f);
+        camGO.transform.position = new Vector3(1.7f, 1.6f, -0.5f);
+        camGO.transform.rotation = Quaternion.LookRotation((new Vector3(0f, 0.85f, 2.5f) - camGO.transform.position).normalized, Vector3.up);
 
         // Light
         var lightGO = new GameObject("Directional Light");
@@ -35,6 +35,8 @@ public static class FactorySceneBuilder
         light.type = LightType.Directional;
         light.intensity = 1.1f;
         lightGO.transform.rotation = Quaternion.Euler(50f, -30f, 0f);
+        RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;
+        RenderSettings.ambientLight = new Color(0.34f, 0.36f, 0.42f);
 
         // Floor
         var floor = GameObject.CreatePrimitive(PrimitiveType.Plane);
@@ -47,7 +49,8 @@ public static class FactorySceneBuilder
         // Bootstrap
         var demoGO = new GameObject("FactoryDemo Bootstrap");
         var boot = demoGO.AddComponent<FactoryDemoBootstrap>();
-        boot.placeRelativeTo = camGO.transform;
+        boot.placeRelativeTo = null;
+        boot.placeInFrontOfCamera = false; // fixed belt position; camera views it at an angle
 
         EditorSceneManager.MarkSceneDirty(scene);
         EditorSceneManager.SaveScene(scene, ScenePath);
@@ -61,7 +64,7 @@ public static class FactorySceneBuilder
     // /tmp/factoryframes, then makes it the build scene (for the gif capture).
     public static void BuildCaptureScene()
     {
-        AssetDatabase.Refresh();
+        Build();
         var scene = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
         var boot = Object.FindFirstObjectByType<FactoryDemoBootstrap>();
         if (boot == null) { Debug.LogError("FactorySceneBuilder: bootstrap not found; run Build first."); return; }
