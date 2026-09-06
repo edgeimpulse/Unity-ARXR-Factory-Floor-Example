@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: bfb802b8e2766c5459087aaf775f56d8
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 257649
+  packageName: Factory Conveyor
+  packageVersion: 1.0
+  assetPath: Assets/Factory Conveyor/Timeline/timeline_high.playable
+  uploadId: 603249

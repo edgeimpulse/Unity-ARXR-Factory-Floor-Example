@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: d21da8c4f8860ba479e9f3f0e8da82f3
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 257649
+  packageName: Factory Conveyor
+  packageVersion: 1.0
+  assetPath: Assets/Factory Conveyor/mesh/material/conveyor_MT.mat
+  uploadId: 603249

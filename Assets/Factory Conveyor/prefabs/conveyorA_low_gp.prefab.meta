@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 8563d1550b6bbbf418afda66eddc714a
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 257649
+  packageName: Factory Conveyor
+  packageVersion: 1.0
+  assetPath: Assets/Factory Conveyor/prefabs/conveyorA_low_gp.prefab
+  uploadId: 603249
