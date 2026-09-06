@@ -16,6 +16,11 @@ line (the bottle "breaks"), while **`cap_correct`** bottles pass through.
 > [APK from Releases](https://github.com/edgeimpulse/Unity-ARXR-Factory-Floor-Example/releases)
 > to try it on a headset, or follow the step-by-step [tutorial](docs/TUTORIAL.md).
 
+Walk the floor and pick a bottle off the line to inspect it in your hand
+([watch the video](docs/media/factory-walkthrough.mp4)):
+
+![Walk up and pick up a bottle](docs/media/factory-walkthrough.gif)
+
 ## Edge Impulse model
 
 - Public project (clone it yourself):

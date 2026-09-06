@@ -19,8 +19,10 @@ public static class DemoFilm
         EditorApplication.playModeStateChanged += OnPlayModeChanged;
         EditorApplication.update += SafetyTimeout;
         startTime = EditorApplication.timeSinceStartup;
-        EditorSceneManager.OpenScene(CapturePath, OpenSceneMode.Single);
-        Debug.Log("DemoFilm: entering play mode to capture frames...");
+        var scenes = EditorBuildSettings.scenes;
+        string path = (scenes != null && scenes.Length > 0 && !string.IsNullOrEmpty(scenes[0].path)) ? scenes[0].path : CapturePath;
+        EditorSceneManager.OpenScene(path, OpenSceneMode.Single);
+        Debug.Log($"DemoFilm: entering play mode to capture '{path}'...");
         EditorApplication.EnterPlaymode();
     }
 
