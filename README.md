@@ -30,6 +30,19 @@ target platform. See Edge Impulse's
 > **Note:** never commit your Edge Impulse API key. Keep it in an environment
 > variable or an untracked file (see `.gitignore`).
 
+## Download & try it
+
+A **nightly APK** is built automatically by GitHub Actions and published on the
+[Releases page](https://github.com/edgeimpulse/Unity-ARXR-Factory-Floor-Example/releases/tag/nightly).
+Download the latest `.apk` and sideload it:
+
+```bash
+adb install -r FactoryFloorXR-nightly-latest.apk
+```
+
+See [docs/CI-NIGHTLY-BUILD.md](docs/CI-NIGHTLY-BUILD.md) for the CI setup and the
+repository secrets required to enable the build.
+
 ## Requirements
 
 - Unity **6000.0.32f1**

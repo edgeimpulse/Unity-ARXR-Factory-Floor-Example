@@ -1,0 +1,106 @@
+name: Nightly APK Build
+
+# Builds a sideloadable Android/Quest APK every night and publishes it as a
+# downloadable artifact and a rolling "nightly" pre-release.
+#
+# REQUIRED repository secrets (Settings -> Secrets and variables -> Actions):
+#   UNITY_LICENSE   Contents of your Unity_v6000.x.ulf activation file (Personal license)
+#   UNITY_EMAIL     Your Unity account email
+#   UNITY_PASSWORD  Your Unity account password
+# See docs/CI-NIGHTLY-BUILD.md for how to generate the .ulf activation file.
+# Until these secrets are set, the build job is skipped (not failed).
+
+on:
+  schedule:
+    - cron: '0 3 * * *'      # every night at 03:00 UTC
+  workflow_dispatch:          # allow manual runs from the Actions tab
+
+concurrency:
+  group: nightly-apk
+  cancel-in-progress: true
+
+permissions:
+  contents: write             # needed to publish the rolling nightly release
+
+jobs:
+  preflight:
+    name: Check build secrets
+    runs-on: ubuntu-latest
+    outputs:
+      enabled: ${{ steps.check.outputs.enabled }}
+    steps:
+      - id: check
+        env:
+          HAS_SECRETS: ${{ secrets.UNITY_LICENSE != '' && secrets.UNITY_EMAIL != '' && secrets.UNITY_PASSWORD != '' }}
+        run: |
+          echo "enabled=$HAS_SECRETS" >> "$GITHUB_OUTPUT"
+          if [ "$HAS_SECRETS" != "true" ]; then
+            echo "::warning::Unity license secrets are not set - skipping the APK build. See docs/CI-NIGHTLY-BUILD.md."
+          fi
+
+  build:
+    name: Build Android APK
+    needs: preflight
+    if: needs.preflight.outputs.enabled == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Cache Unity Library
+        uses: actions/cache@v4
+        with:
+          path: Library
+          key: Library-Android-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
+          restore-keys: |
+            Library-Android-
+            Library-
+
+      - name: Build (Android / APK)
+        uses: game-ci/unity-builder@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          unityVersion: 6000.0.32f1
+          targetPlatform: Android
+          androidExportType: androidPackage
+          buildName: FactoryFloorXR
+          allowDirtyBuild: true
+
+      - name: Rename APK with date
+        run: |
+          mkdir -p dist
+          APK="$(find build/Android -name '*.apk' | head -n1)"
+          echo "Found APK: $APK"
+          cp "$APK" "dist/FactoryFloorXR-nightly-$(date +%Y%m%d).apk"
+          cp "$APK" "dist/FactoryFloorXR-nightly-latest.apk"
+          ls -lh dist
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: FactoryFloorXR-APK
+          path: dist/*.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Publish rolling nightly release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: nightly
+          name: Nightly APK
+          prerelease: true
+          body: |
+            Automated nightly build of the Factory Floor XR demo.
+
+            **How to use:** download the `.apk` below and sideload it onto a
+            Meta Quest 3 / 3S (or an Android device) with
+            `adb install FactoryFloorXR-nightly-latest.apk`.
+
+            Built from `main` at commit ${{ github.sha }}.
+          files: dist/*.apk
