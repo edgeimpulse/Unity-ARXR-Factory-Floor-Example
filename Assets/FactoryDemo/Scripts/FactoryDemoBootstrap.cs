@@ -88,11 +88,11 @@ public class FactoryDemoBootstrap : MonoBehaviour
 
         var spawn = new GameObject("SpawnPoint").transform;
         spawn.SetParent(root, false);
-        spawn.position = center - right * (beltLength * 0.5f) + Vector3.up * 0.02f;
+        spawn.position = center - right * (beltLength * 0.5f) + Vector3.up * 0.005f;
 
         var exit = new GameObject("ExitPoint").transform;
         exit.SetParent(root, false);
-        exit.position = center + right * (beltLength * 0.5f) + Vector3.up * 0.02f;
+        exit.position = center + right * (beltLength * 0.5f) + Vector3.up * 0.005f;
 
         // inspection gantry: two posts + a top beam with a red scan light
         Vector3 insCenter = Vector3.Lerp(spawn.position, exit.position, 0.55f);
@@ -240,8 +240,8 @@ public class FactoryDemoBootstrap : MonoBehaviour
 
     // Instantiate the real conveyor model and fit it to the bottle path: orient
     // its longest side along the belt, scale it to beltLength and drop it so the
-    // frame sits at beltHeight. Returns the world height of the belt surface so
-    // products and the scanner ride on the belt instead of the frame top.
+    // frame sits at beltHeight. Returns the world height of the belt's carrying
+    // surface (found by raycasting) so products and the scanner ride on it.
     static float FitConveyor(GameObject prefab, Transform parent, Vector3 center, float beltLength, float beltHeight)
     {
         var go = Object.Instantiate(prefab);
@@ -255,12 +255,36 @@ public class FactoryDemoBootstrap : MonoBehaviour
         b = WorldBounds(go);
         go.transform.position += new Vector3(center.x - b.center.x, beltHeight - b.max.y, center.z - b.center.z);
 
+        float surfaceY = MeasureBeltSurface(go, center, beltHeight);
         foreach (var c in go.GetComponentsInChildren<Collider>()) Object.Destroy(c);
-        return BeltSurfaceY(go, beltHeight);
+        return surfaceY;
+    }
+
+    // Find the true top of the belt at its centre: drop temporary colliders on the
+    // parts over the belt line and raycast down, so products rest on the visible
+    // carrying surface rather than the higher roller/frame edges.
+    static float MeasureBeltSurface(GameObject go, Vector3 center, float fallback)
+    {
+        foreach (var mf in go.GetComponentsInChildren<MeshFilter>())
+        {
+            if (mf.sharedMesh == null || mf.GetComponent<Collider>() != null) continue;
+            var r = mf.GetComponent<Renderer>();
+            if (r == null) continue;
+            if (center.x < r.bounds.min.x - 0.1f || center.x > r.bounds.max.x + 0.1f) continue;
+            if (center.z < r.bounds.min.z - 0.3f || center.z > r.bounds.max.z + 0.3f) continue;
+            mf.gameObject.AddComponent<MeshCollider>();
+        }
+        Physics.SyncTransforms();
+
+        float top = WorldBounds(go).max.y;
+        if (Physics.Raycast(new Vector3(center.x, top + 1f, center.z), Vector3.down, out var hit, top + 2f)
+            && hit.collider.transform.IsChildOf(go.transform))
+            return hit.point.y;
+        return BeltSurfaceY(go, fallback);
     }
 
     // The belt mesh child is named "conveyorA/B/C" (chains are "chain*"); its top
-    // face is the ride surface. Falls back to a given height if not found.
+    // is used only as a fallback when the raycast misses.
     static float BeltSurfaceY(GameObject go, float fallback)
     {
         Renderer best = null; float bestArea = 0f;
