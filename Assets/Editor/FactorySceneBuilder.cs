@@ -11,10 +11,12 @@ public static class FactorySceneBuilder
     const string ScenePath = "Assets/Scenes/FactoryFloorDemo.unity";
     const string CapturePath = "Assets/Scenes/FactoryFloorCapture.unity";
     const string WalkthroughPath = "Assets/Scenes/FactoryFloorWalkthrough.unity";
+    const string ConveyorPrefab = "Assets/Factory Conveyor/prefabs/conveyorB_low_gp.prefab";
 
     public static void Build()
     {
         AssetDatabase.Refresh();
+        UpgradeConveyorMaterial();
         ValidateRuntime();
 
         var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
@@ -44,7 +46,8 @@ public static class FactorySceneBuilder
         floor.name = "Floor";
         floor.transform.localScale = new Vector3(3f, 1f, 3f);
         var floorMat = new Material(Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard"));
-        if (floorMat.HasProperty("_BaseColor")) floorMat.SetColor("_BaseColor", new Color(0.18f, 0.19f, 0.22f));
+        if (floorMat.HasProperty("_BaseColor")) floorMat.SetColor("_BaseColor", new Color(0.22f, 0.22f, 0.25f));
+        if (floorMat.HasProperty("_Smoothness")) floorMat.SetFloat("_Smoothness", 0.05f);
         floor.GetComponent<Renderer>().sharedMaterial = floorMat;
 
         // Bootstrap
@@ -52,6 +55,7 @@ public static class FactorySceneBuilder
         var boot = demoGO.AddComponent<FactoryDemoBootstrap>();
         boot.placeRelativeTo = null;
         boot.placeInFrontOfCamera = false; // fixed belt position; camera views it at an angle
+        boot.conveyorPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(ConveyorPrefab);
 
         EditorSceneManager.MarkSceneDirty(scene);
         EditorSceneManager.SaveScene(scene, ScenePath);
@@ -104,13 +108,15 @@ public static class FactorySceneBuilder
         floor.name = "Floor";
         floor.transform.localScale = new Vector3(3f, 1f, 3f);
         var floorMat = new Material(Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard"));
-        if (floorMat.HasProperty("_BaseColor")) floorMat.SetColor("_BaseColor", new Color(0.18f, 0.19f, 0.22f));
+        if (floorMat.HasProperty("_BaseColor")) floorMat.SetColor("_BaseColor", new Color(0.22f, 0.22f, 0.25f));
+        if (floorMat.HasProperty("_Smoothness")) floorMat.SetFloat("_Smoothness", 0.05f);
         floor.GetComponent<Renderer>().sharedMaterial = floorMat;
 
         var demoGO = new GameObject("FactoryDemo Bootstrap");
         var boot = demoGO.AddComponent<FactoryDemoBootstrap>();
         boot.placeRelativeTo = null;
         boot.placeInFrontOfCamera = false;
+        boot.conveyorPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(ConveyorPrefab);
 
         var dir = new GameObject("Director");
         var wt = dir.AddComponent<PlayerWalkthrough>();
@@ -138,8 +144,35 @@ public static class FactorySceneBuilder
         var go = new GameObject("VBoot");
         var boot = go.AddComponent<FactoryDemoBootstrap>();
         boot.placeRelativeTo = camGO.transform;
+        boot.conveyorPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(ConveyorPrefab);
         go.SendMessage("Start", SendMessageOptions.DontRequireReceiver);
         Debug.Log("FactorySceneBuilder: runtime validation constructed the demo without errors.");
+    }
+
+    // The Factory Conveyor asset ships with a built-in Standard material that
+    // renders magenta under URP; convert it to URP/Lit and rebind its maps.
+    public static void UpgradeConveyorMaterial()
+    {
+        const string matPath = "Assets/Factory Conveyor/mesh/material/conveyor_MT.mat";
+        var mat = AssetDatabase.LoadAssetAtPath<Material>(matPath);
+        var urp = Shader.Find("Universal Render Pipeline/Lit");
+        if (mat == null || urp == null) { Debug.LogWarning("FactorySceneBuilder: conveyor material or URP shader missing."); return; }
+        if (mat.shader == urp) return;
+
+        var col = mat.HasProperty("_MainTex") ? mat.GetTexture("_MainTex") : null;
+        var nml = mat.HasProperty("_BumpMap") ? mat.GetTexture("_BumpMap") : null;
+        var mtl = mat.HasProperty("_MetallicGlossMap") ? mat.GetTexture("_MetallicGlossMap") : null;
+
+        mat.shader = urp;
+        if (col) mat.SetTexture("_BaseMap", col);
+        if (nml) { mat.SetTexture("_BumpMap", nml); mat.EnableKeyword("_NORMALMAP"); }
+        if (mtl) { mat.SetTexture("_MetallicGlossMap", mtl); mat.EnableKeyword("_METALLICSPECGLOSSMAP"); }
+        mat.SetColor("_BaseColor", Color.white);
+        mat.SetFloat("_Smoothness", 0.5f);
+        mat.SetFloat("_WorkflowMode", 1f);
+        EditorUtility.SetDirty(mat);
+        AssetDatabase.SaveAssets();
+        Debug.Log("FactorySceneBuilder: upgraded conveyor_MT.mat to URP/Lit.");
     }
 }
 

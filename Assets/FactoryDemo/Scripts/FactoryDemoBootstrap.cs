@@ -17,6 +17,9 @@ public class FactoryDemoBootstrap : MonoBehaviour
     [Tooltip("When true (and no placeRelativeTo) the belt is placed in front of the main camera; when false it uses a fixed world position.")]
     public bool placeInFrontOfCamera = true;
 
+    [Tooltip("Optional real conveyor model, auto-fitted to the belt path. Falls back to a primitive belt when unset.")]
+    public GameObject conveyorPrefab;
+
     [Header("Tuning")]
     public float beltSpeed = 0.7f;
     public float spawnInterval = 1.0f;
@@ -46,29 +49,40 @@ public class FactoryDemoBootstrap : MonoBehaviour
         var root = new GameObject("FactoryDemo").transform;
         root.position = center;
 
-        // --- belt visual + support -------------------------------------------------
-        var beltRot = Quaternion.LookRotation(-faceDir, Vector3.up);
-        var belt = GameObject.CreatePrimitive(PrimitiveType.Cube);
-        belt.name = "Belt";
-        belt.transform.SetParent(root, false);
-        belt.transform.localScale = new Vector3(beltLength, 0.06f, 0.5f);
-        belt.transform.rotation = beltRot;
-        var beltRenderer = belt.GetComponent<Renderer>();
-        var beltMat = MakeMaterial(new Color(0.16f, 0.17f, 0.2f));
-        var stripes = MakeStripeTexture();
-        if (beltMat.HasProperty("_BaseMap")) beltMat.SetTexture("_BaseMap", stripes);
-        beltMat.mainTexture = stripes;
-        beltMat.mainTextureScale = new Vector2(Mathf.Max(2f, Mathf.Round(beltLength * 6f)), 2f);
-        beltRenderer.material = beltMat;
-        Destroy(belt.GetComponent<Collider>());
+        BuildEnvironment(root, center, faceDir);
 
-        var legs = GameObject.CreatePrimitive(PrimitiveType.Cube);
-        legs.name = "Support";
-        legs.transform.SetParent(root, false);
-        legs.transform.localScale = new Vector3(beltLength * 0.98f, beltHeight, 0.4f);
-        legs.transform.position = center + Vector3.down * beltHeight * 0.5f;
-        legs.transform.rotation = beltRot;
-        legs.GetComponent<Renderer>().material = MakeMaterial(new Color(0.25f, 0.27f, 0.3f));
+        // --- belt: real conveyor model if provided, else a primitive stand-in ------
+        var beltRot = Quaternion.LookRotation(-faceDir, Vector3.up);
+        Renderer beltRenderer = null;
+
+        if (conveyorPrefab)
+        {
+            FitConveyor(conveyorPrefab, root, center, beltLength, beltHeight);
+        }
+        else
+        {
+            var belt = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            belt.name = "Belt";
+            belt.transform.SetParent(root, false);
+            belt.transform.localScale = new Vector3(beltLength, 0.06f, 0.5f);
+            belt.transform.rotation = beltRot;
+            beltRenderer = belt.GetComponent<Renderer>();
+            var beltMat = MakeMaterial(new Color(0.16f, 0.17f, 0.2f));
+            var stripes = MakeStripeTexture();
+            if (beltMat.HasProperty("_BaseMap")) beltMat.SetTexture("_BaseMap", stripes);
+            beltMat.mainTexture = stripes;
+            beltMat.mainTextureScale = new Vector2(Mathf.Max(2f, Mathf.Round(beltLength * 6f)), 2f);
+            beltRenderer.material = beltMat;
+            Destroy(belt.GetComponent<Collider>());
+
+            var legs = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            legs.name = "Support";
+            legs.transform.SetParent(root, false);
+            legs.transform.localScale = new Vector3(beltLength * 0.98f, beltHeight, 0.4f);
+            legs.transform.position = center + Vector3.down * beltHeight * 0.5f;
+            legs.transform.rotation = beltRot;
+            legs.GetComponent<Renderer>().material = MakeMaterial(new Color(0.25f, 0.27f, 0.3f));
+        }
 
         var spawn = new GameObject("SpawnPoint").transform;
         spawn.SetParent(root, false);
@@ -183,8 +197,8 @@ public class FactoryDemoBootstrap : MonoBehaviour
 
         var armBody = GameObject.CreatePrimitive(PrimitiveType.Cube);
         armBody.name = "ArmBody"; armBody.transform.SetParent(armRoot, false);
-        armBody.transform.localScale = new Vector3(0.14f, 0.14f, 0.24f);
-        armBody.transform.localPosition = new Vector3(0f, 0f, -0.04f);
+        armBody.transform.localScale = new Vector3(0.17f, 0.20f, 0.32f);
+        armBody.transform.localPosition = new Vector3(0f, 0f, -0.06f);
         armBody.GetComponent<Renderer>().material = MakeMaterial(new Color(0.86f, 0.62f, 0.1f));
         Destroy(armBody.GetComponent<Collider>());
 
@@ -197,7 +211,7 @@ public class FactoryDemoBootstrap : MonoBehaviour
 
         var armPad = GameObject.CreatePrimitive(PrimitiveType.Cube);
         armPad.name = "Pad"; armPad.transform.SetParent(armPiston.transform, false);
-        armPad.transform.localScale = new Vector3(1.7f, 1.7f, 0.22f);
+        armPad.transform.localScale = new Vector3(1.9f, 1.9f, 0.25f);
         armPad.transform.localPosition = new Vector3(0f, 0f, 0.5f);
         armPad.GetComponent<Renderer>().material = MakeMaterial(new Color(0.18f, 0.19f, 0.22f));
         Destroy(armPad.GetComponent<Collider>());
@@ -212,6 +226,93 @@ public class FactoryDemoBootstrap : MonoBehaviour
         Debug.Log($"FactoryDemoBootstrap: ready. EI native = {EdgeImpulseFOMO.Available}, " +
                   $"correct imgs = {spawner.correctImages.Length}, defect imgs = {spawner.defectImages.Length}, " +
                   $"bottle prefab = {(spawner.bottlePrefab ? "loaded" : "MISSING")}");
+    }
+
+    // Instantiate the real conveyor model and fit it to the bottle path: orient
+    // its longest side along the belt, scale it to beltLength and drop it so the
+    // belt surface sits at beltHeight, centred on the belt.
+    static void FitConveyor(GameObject prefab, Transform parent, Vector3 center, float beltLength, float beltHeight)
+    {
+        var go = Object.Instantiate(prefab);
+        go.name = "Conveyor";
+        go.transform.SetParent(parent, false);
+        go.transform.rotation = Quaternion.identity;
+
+        var b = WorldBounds(go);
+        if (b.size.z > b.size.x) { go.transform.rotation = Quaternion.Euler(0f, 90f, 0f); b = WorldBounds(go); }
+        go.transform.localScale *= beltLength / Mathf.Max(b.size.x, 1e-3f);
+        b = WorldBounds(go);
+        go.transform.position += new Vector3(center.x - b.center.x, beltHeight - b.max.y, center.z - b.center.z);
+
+        foreach (var c in go.GetComponentsInChildren<Collider>()) Object.Destroy(c);
+    }
+
+    static Bounds WorldBounds(GameObject go)
+    {
+        var rends = go.GetComponentsInChildren<Renderer>();
+        if (rends.Length == 0) return new Bounds(go.transform.position, Vector3.one);
+        var b = rends[0].bounds;
+        for (int i = 1; i < rends.Length; i++) b.Encapsulate(rends[i].bounds);
+        return b;
+    }
+
+    // A simple factory bay around the line: back + side walls, a few crates and
+    // an emergency-stop station, so the belt sits in a room rather than a void.
+    static void BuildEnvironment(Transform root, Vector3 center, Vector3 faceDir)
+    {
+        var wallMat = MakeMaterial(new Color(0.30f, 0.32f, 0.36f));
+        float back = center.z + 3.2f;   // faceDir points toward the camera (-Z here)
+        Wall(root, "BackWall", new Vector3(center.x, 1.8f, back), new Vector3(14f, 3.6f, 0.2f), wallMat);
+        Wall(root, "LeftWall", new Vector3(center.x - 6f, 1.8f, center.z + 0.4f), new Vector3(0.2f, 3.6f, 7.6f), wallMat);
+        Wall(root, "RightWall", new Vector3(center.x + 6f, 1.8f, center.z + 0.4f), new Vector3(0.2f, 3.6f, 7.6f), wallMat);
+
+        var crateMat = MakeMaterial(new Color(0.46f, 0.33f, 0.17f));
+        Crate(root, new Vector3(center.x - 3.3f, 0.4f, center.z + 0.7f), 0.8f, crateMat);
+        Crate(root, new Vector3(center.x - 3.1f, 1.15f, center.z + 0.6f), 0.62f, crateMat);
+        Crate(root, new Vector3(center.x + 3.4f, 0.45f, center.z + 0.8f), 0.9f, crateMat);
+
+        Vector3 camPos = Camera.main ? Camera.main.transform.position : center - faceDir * 3f;
+        Vector3 toCam = camPos - center; toCam.y = 0f; toCam = toCam.sqrMagnitude > 1e-3f ? toCam.normalized : Vector3.back;
+        BuildEStop(root, center + toCam * 0.75f + new Vector3(-1.35f, -center.y, 0f));
+    }
+
+    static void Wall(Transform root, string name, Vector3 pos, Vector3 scale, Material m)
+    {
+        var w = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        w.name = name; w.transform.SetParent(root, false);
+        w.transform.position = pos; w.transform.localScale = scale;
+        w.GetComponent<Renderer>().material = m;
+    }
+
+    static void Crate(Transform root, Vector3 pos, float size, Material m)
+    {
+        var c = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        c.name = "Crate"; c.transform.SetParent(root, false);
+        c.transform.position = pos; c.transform.localScale = Vector3.one * size;
+        c.transform.rotation = Quaternion.Euler(0f, Random.Range(-20f, 20f), 0f);
+        c.GetComponent<Renderer>().material = m;
+    }
+
+    static void BuildEStop(Transform root, Vector3 basePos)
+    {
+        var post = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+        post.name = "EStopPost"; post.transform.SetParent(root, false);
+        post.transform.position = basePos + Vector3.up * 0.5f;
+        post.transform.localScale = new Vector3(0.05f, 0.5f, 0.05f);
+        post.GetComponent<Renderer>().material = MakeMaterial(new Color(0.5f, 0.5f, 0.54f));
+
+        var box = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        box.name = "EStopBox"; box.transform.SetParent(root, false);
+        box.transform.position = basePos + Vector3.up * 1.0f;
+        box.transform.localScale = new Vector3(0.16f, 0.16f, 0.09f);
+        box.GetComponent<Renderer>().material = MakeMaterial(new Color(0.9f, 0.75f, 0.05f));
+
+        var btn = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+        btn.name = "EStopButton"; btn.transform.SetParent(root, false);
+        btn.transform.position = basePos + Vector3.up * 1.0f + new Vector3(0f, 0f, -0.07f);
+        btn.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
+        btn.transform.localScale = new Vector3(0.07f, 0.02f, 0.07f);
+        btn.GetComponent<Renderer>().material = MakeMaterial(new Color(0.8f, 0.05f, 0.05f));
     }
 
     static Texture2D[] LoadSamples(string prefix)
