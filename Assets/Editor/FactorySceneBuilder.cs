@@ -116,7 +116,7 @@ public static class FactorySceneBuilder
         var wt = dir.AddComponent<PlayerWalkthrough>();
         wt.head = camGO.transform;
         var rec = dir.AddComponent<DemoRecorder>();
-        rec.frames = 360;
+        rec.frames = 420;
         rec.outputDir = "/tmp/factoryframes";
 
         EditorSceneManager.MarkSceneDirty(scene);

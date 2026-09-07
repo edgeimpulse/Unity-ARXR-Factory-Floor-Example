@@ -6,8 +6,9 @@ on a moving conveyor belt.
 
 Bottles travel along a conveyor. A virtual inspection camera runs an Edge Impulse
 **FOMO object-detection** model (bottle-cap detection). Bottles whose cap is
-classified as **`cap_incorrect`** are flagged as defective and removed from the
-line (the bottle "breaks"), while **`cap_correct`** bottles pass through.
+classified as **`cap_incorrect`** are flagged as defective: a **reject arm shoves
+them off the belt** and they **smash on the floor**, while **`cap_correct`**
+bottles pass through.
 
 ![The conveyor inspection demo](docs/media/factory-demo.gif)
 
@@ -65,7 +66,8 @@ repository secrets required to enable the build.
 
 | Path | Purpose |
 | --- | --- |
-| `Assets/Scenes/SampleScene.unity` | Main XR scene (build scene) |
+| `Assets/Scenes/FactoryFloorDemo.unity` | Main demo scene (build scene), assembled at runtime by `FactoryDemoBootstrap` |
+| `Assets/FactoryDemo/Scripts/` | Conveyor, inspection, reject arm and Edge Impulse glue |
 | `Assets/Factory Conveyor/` | Conveyor models, materials and prefabs |
 | `Assets/Bottle/` | Bottle + broken-bottle prefabs and scripts |
 | `Assets/XR*`, `Assets/Samples/` | XR rig, hands and interaction samples |

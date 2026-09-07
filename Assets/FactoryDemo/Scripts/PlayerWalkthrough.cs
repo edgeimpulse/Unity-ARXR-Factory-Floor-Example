@@ -10,14 +10,23 @@ public class PlayerWalkthrough : MonoBehaviour
 
     [Header("Path (world space)")]
     public Vector3 startPos = new Vector3(0f, 1.5f, 0.3f);
-    public Vector3 standPos = new Vector3(0f, 1.5f, 1.55f);
+    public Vector3 standPos = new Vector3(0f, 1.5f, 1.6f);
     public Vector3 beltLook = new Vector3(0f, 1.0f, 2.55f);
-    public Vector3 pickupPos = new Vector3(0f, 0.98f, 2.4f);
+    public Vector3 pickupPos = new Vector3(0.5f, 1.08f, 2.4f);
+    public Vector3 detectorPos = new Vector3(0.12f, 1.08f, 2.6f);
+    public Vector3 inspectLook = new Vector3(0f, 1.2f, 2.5f);
+    public Vector3 detectorLook = new Vector3(0.12f, 1.18f, 2.6f);
 
     Transform hand;
     Transform bottle;
+    Bottle bottleComp;
+    Renderer scanLight;
+    Material scanMat;
+    Color scanBaseEmission;
+    float bottleScale = 1f;
     float t;
     bool grabbed;
+    bool broken;
 
     void Start()
     {
@@ -35,42 +44,88 @@ public class PlayerWalkthrough : MonoBehaviour
     void LateUpdate()
     {
         t += Time.deltaTime;
+        TryBindScene();
 
-        // --- head position: walk in, then a slow strafe while inspecting --------
-        Vector3 hp = (t < 3.2f) ? Vector3.Lerp(startPos, standPos, S(0f, 3.2f, t)) : standPos;
-        if (t > 6.2f) hp += new Vector3(Mathf.Sin((t - 6.2f) * 0.7f) * 0.55f, 0f, 0f);
-        if (t < 3.2f) hp.y += Mathf.Sin(t * 8f) * 0.02f; // subtle head-bob while walking
+        // --- head: walk in, then hold position -------------------------------
+        Vector3 hp = (t < 3.0f) ? Vector3.Lerp(startPos, standPos, S(0f, 3.0f, t)) : standPos;
+        if (t < 3.0f) hp.y += Mathf.Sin(t * 8f) * 0.02f;   // subtle head-bob while walking
         head.position = hp;
 
-        // head looks at a stable point (never at the hand, to avoid feedback)
-        Vector3 lookTarget = (t < 3.4f) ? beltLook : new Vector3(head.position.x, 1.16f, 2.85f);
+        // head look pans from the belt, to the inspected bottle, to the detector
+        Vector3 lookTarget = (t >= 5.4f) ? detectorLook : (t >= 3.2f ? inspectLook : beltLook);
         var want = Quaternion.LookRotation((lookTarget - head.position).normalized, Vector3.up);
-        head.rotation = Quaternion.Slerp(head.rotation, want, 0.14f);
+        head.rotation = Quaternion.Slerp(head.rotation, want, 0.12f);
 
-        // bottle: on the belt, then lifted to a held pose in front of the camera
-        Vector3 bottleHold = head.position + head.forward * 0.37f + head.right * 0.02f - head.up * 0.13f;
+        // --- bottle path: belt -> held inspect -> under the detector ----------
+        Vector3 held = head.position + head.forward * 0.42f - head.up * 0.12f;
         Vector3 bottlePos = pickupPos;
         float spin = 0f;
-        if (t >= 4.35f)
+        if (t >= 4.1f && t < 5.7f)            // lift up and inspect
         {
-            bottlePos = Vector3.Lerp(pickupPos, bottleHold, S(4.35f, 6.0f, t));
-            spin = (t - 4.35f) * 28f;
+            bottlePos = Vector3.Lerp(pickupPos, held, S(4.1f, 5.5f, t));
+            spin = (t - 4.1f) * 26f;
         }
-        if (grabbed && bottle)
+        else if (t >= 5.7f)                   // carry down to the detector
+        {
+            bottlePos = Vector3.Lerp(held, detectorPos, S(5.7f, 7.2f, t));
+            spin = 1.6f * 26f;
+        }
+        if (bottle)
         {
             bottle.position = bottlePos;
-            bottle.rotation = Quaternion.Euler(0f, spin, 4f);   // upright, slowly inspected
+            bottle.rotation = Quaternion.Euler(0f, spin, 0f);
         }
 
-        // hand: rest -> reach down to the belt -> cup just below the bottle
+        // --- scan light pulses while the bottle sits under the detector -------
+        if (scanMat != null)
+        {
+            float pulse = (t >= 7.2f && t < 8.5f) ? 1f + 0.9f * Mathf.Abs(Mathf.Sin((t - 7.2f) * 6f)) : 1f;
+            if (broken && t < 9.2f) pulse = 2.4f;   // bright flash on the break
+            scanMat.SetColor("_EmissionColor", scanBaseEmission * pulse);
+        }
+
+        // --- the gloved hand smashes the bottle under the detector -----------
+        if (!broken && t >= 8.5f && bottleComp)
+        {
+            bottleComp.Explode(bottleScale);
+            broken = true;
+        }
+
+        // --- hand choreography ----------------------------------------------
         Vector3 rest = head.position + head.forward * 0.34f + head.right * 0.17f - head.up * 0.26f;
         Vector3 handPos;
-        if (t < 3.4f) handPos = rest;
-        else if (t < 4.2f) handPos = Vector3.Lerp(rest, pickupPos - Vector3.up * 0.03f, S(3.4f, 4.2f, t));
-        else if (t < 4.35f) { handPos = pickupPos - Vector3.up * 0.03f; grabbed = true; }
-        else handPos = bottlePos - head.up * 0.03f - head.forward * 0.02f;
+        if (t < 3.2f) handPos = rest;                                                        // walking
+        else if (t < 4.0f) handPos = Vector3.Lerp(rest, pickupPos - Vector3.up * 0.02f, S(3.2f, 4.0f, t)); // reach
+        else if (t < 4.1f) { handPos = pickupPos - Vector3.up * 0.02f; grabbed = true; }      // grab
+        else if (t < 7.2f) handPos = bottlePos - head.up * 0.03f - head.forward * 0.02f;      // cup the bottle
+        else if (t < 8.5f)                                                                    // raise, poised to strike
+            handPos = Vector3.Lerp(detectorPos + new Vector3(0f, 0.34f, -0.04f), detectorPos + new Vector3(0f, 0.12f, 0f), S(8.2f, 8.5f, t));
+        else                                                                                 // smash + recoil
+            handPos = Vector3.Lerp(detectorPos + new Vector3(0f, 0.10f, 0f), detectorPos + new Vector3(0.05f, 0.42f, -0.1f), S(8.5f, 9.4f, t));
         hand.position = handPos;
         hand.rotation = Quaternion.LookRotation(head.forward, Vector3.up);
+    }
+
+    // Bind the scanner light (for the pulse) and drop a collider on the belt so
+    // the shattered glass has something to land on. Done lazily because the
+    // bootstrap builds those objects in its own Start().
+    void TryBindScene()
+    {
+        if (scanMat != null) return;
+        var scan = GameObject.Find("ScanLight");
+        var belt = GameObject.Find("Belt");
+        if (scan == null || belt == null) return;
+        scanLight = scan.GetComponent<Renderer>();
+        if (scanLight == null) return;
+        scanMat = scanLight.material;   // instance copy
+        scanBaseEmission = scanMat.HasProperty("_EmissionColor") ? scanMat.GetColor("_EmissionColor") : new Color(1f, 0.15f, 0.1f) * 2.5f;
+        scanMat.EnableKeyword("_EMISSION");
+
+        var b = belt.GetComponent<Renderer>().bounds;
+        var catcher = new GameObject("ShardCatcher");
+        catcher.AddComponent<BoxCollider>();
+        catcher.transform.position = new Vector3(b.center.x, b.max.y - 0.01f, b.center.z);
+        catcher.transform.localScale = new Vector3(b.size.x, 0.02f, b.size.z);
     }
 
     // -- construction ---------------------------------------------------------
@@ -83,7 +138,8 @@ public class PlayerWalkthrough : MonoBehaviour
         go.transform.rotation = Quaternion.identity;
         foreach (var rb in go.GetComponentsInChildren<Rigidbody>()) rb.isKinematic = true;
         foreach (var c in go.GetComponentsInChildren<Collider>()) c.enabled = false;
-        NormalizeHeight(go, 0.30f);
+        bottleScale = NormalizeHeight(go, 0.30f);
+        bottleComp = go.GetComponentInChildren<Bottle>();
         return go.transform;
     }
 
@@ -117,13 +173,16 @@ public class PlayerWalkthrough : MonoBehaviour
         return m;
     }
 
-    static void NormalizeHeight(GameObject go, float target)
+    static float NormalizeHeight(GameObject go, float target)
     {
         var rends = go.GetComponentsInChildren<Renderer>();
-        if (rends.Length == 0) return;
+        if (rends.Length == 0) return 1f;
         var b = rends[0].bounds;
         for (int i = 1; i < rends.Length; i++) b.Encapsulate(rends[i].bounds);
-        if (b.size.y > 1e-4f) go.transform.localScale *= target / b.size.y;
+        if (b.size.y <= 1e-4f) return 1f;
+        float f = target / b.size.y;
+        go.transform.localScale *= f;
+        return f;
     }
 
     static float S(float a, float b, float x) => Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(a, b, x));

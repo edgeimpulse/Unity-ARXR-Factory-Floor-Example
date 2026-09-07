@@ -14,4 +14,5 @@ public class ProductItem : MonoBehaviour
     [HideInInspector] public float progress;   // 0..1 along the belt
     [HideInInspector] public bool inspected;
     [HideInInspector] public bool flaggedDefect;
+    [HideInInspector] public float shardScale = 1f;   // matches shards to the resized bottle
 }

@@ -168,6 +168,47 @@ public class FactoryDemoBootstrap : MonoBehaviour
         spawner.correctImages = LoadSamples("cap_correct");
         spawner.defectImages = LoadSamples("cap_incorrect");
 
+        // --- reject pusher: shoves failed bottles off the belt so they smash ------
+        float rejectAt = 0.72f;
+        Vector3 widthDir = Vector3.Cross(Vector3.up, right).normalized;
+        Vector3 camPos = Camera.main ? Camera.main.transform.position : center - faceDir * 3f;
+        Vector3 toCam = camPos - center; toCam.y = 0f;
+        Vector3 pushDir = Vector3.Dot(widthDir, toCam) >= 0f ? widthDir : -widthDir;   // shove toward the viewer
+        Vector3 rejectPos = Vector3.Lerp(spawn.position, exit.position, rejectAt);
+
+        var armRoot = new GameObject("RejectArm").transform;
+        armRoot.SetParent(root, false);
+        armRoot.position = new Vector3(rejectPos.x, center.y + 0.12f, rejectPos.z) - pushDir * 0.40f;
+        armRoot.rotation = Quaternion.LookRotation(pushDir, Vector3.up);
+
+        var armBody = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        armBody.name = "ArmBody"; armBody.transform.SetParent(armRoot, false);
+        armBody.transform.localScale = new Vector3(0.14f, 0.14f, 0.24f);
+        armBody.transform.localPosition = new Vector3(0f, 0f, -0.04f);
+        armBody.GetComponent<Renderer>().material = MakeMaterial(new Color(0.86f, 0.62f, 0.1f));
+        Destroy(armBody.GetComponent<Collider>());
+
+        var armPiston = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        armPiston.name = "Piston"; armPiston.transform.SetParent(armRoot, false);
+        armPiston.transform.localScale = new Vector3(0.09f, 0.09f, 0.20f);
+        armPiston.transform.localPosition = new Vector3(0f, 0f, 0.12f);
+        armPiston.GetComponent<Renderer>().material = MakeMaterial(new Color(0.32f, 0.33f, 0.37f));
+        Destroy(armPiston.GetComponent<Collider>());
+
+        var armPad = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        armPad.name = "Pad"; armPad.transform.SetParent(armPiston.transform, false);
+        armPad.transform.localScale = new Vector3(1.7f, 1.7f, 0.22f);
+        armPad.transform.localPosition = new Vector3(0f, 0f, 0.5f);
+        armPad.GetComponent<Renderer>().material = MakeMaterial(new Color(0.18f, 0.19f, 0.22f));
+        Destroy(armPad.GetComponent<Collider>());
+
+        var rejectArm = armRoot.gameObject.AddComponent<RejectArm>();
+        rejectArm.piston = armPiston.transform;
+        rejectArm.stroke = 0.30f;
+
+        spawner.rejectArm = rejectArm;
+        spawner.rejectAt = rejectAt;
+
         Debug.Log($"FactoryDemoBootstrap: ready. EI native = {EdgeImpulseFOMO.Available}, " +
                   $"correct imgs = {spawner.correctImages.Length}, defect imgs = {spawner.defectImages.Length}, " +
                   $"bottle prefab = {(spawner.bottlePrefab ? "loaded" : "MISSING")}");
