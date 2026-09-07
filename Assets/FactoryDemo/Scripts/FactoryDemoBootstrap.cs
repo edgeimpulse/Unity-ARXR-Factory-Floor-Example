@@ -57,7 +57,9 @@ public class FactoryDemoBootstrap : MonoBehaviour
 
         if (conveyorPrefab)
         {
-            FitConveyor(conveyorPrefab, root, center, beltLength, beltHeight);
+            float surfaceY = FitConveyor(conveyorPrefab, root, center, beltLength, beltHeight);
+            beltHeight = surfaceY;   // ride products + scanner on the actual belt surface
+            center.y = surfaceY;
         }
         else
         {
@@ -86,11 +88,11 @@ public class FactoryDemoBootstrap : MonoBehaviour
 
         var spawn = new GameObject("SpawnPoint").transform;
         spawn.SetParent(root, false);
-        spawn.position = center - right * (beltLength * 0.5f) + Vector3.up * 0.06f;
+        spawn.position = center - right * (beltLength * 0.5f) + Vector3.up * 0.02f;
 
         var exit = new GameObject("ExitPoint").transform;
         exit.SetParent(root, false);
-        exit.position = center + right * (beltLength * 0.5f) + Vector3.up * 0.06f;
+        exit.position = center + right * (beltLength * 0.5f) + Vector3.up * 0.02f;
 
         // inspection gantry: two posts + a top beam with a red scan light
         Vector3 insCenter = Vector3.Lerp(spawn.position, exit.position, 0.55f);
@@ -98,16 +100,16 @@ public class FactoryDemoBootstrap : MonoBehaviour
         beam.name = "ScannerBeam"; beam.transform.SetParent(root, false);
         beam.transform.localScale = new Vector3(0.08f, 0.08f, 0.72f);
         beam.transform.rotation = beltRot;
-        beam.transform.position = insCenter + Vector3.up * 0.44f;
+        beam.transform.position = insCenter + Vector3.up * 0.50f;
         beam.GetComponent<Renderer>().material = MakeMaterial(new Color(0.82f, 0.85f, 0.9f));
         Destroy(beam.GetComponent<Collider>());
         for (int s = -1; s <= 1; s += 2)
         {
             var post = GameObject.CreatePrimitive(PrimitiveType.Cube);
             post.name = "ScannerPost"; post.transform.SetParent(root, false);
-            post.transform.localScale = new Vector3(0.06f, 0.46f, 0.06f);
+            post.transform.localScale = new Vector3(0.07f, 0.66f, 0.07f);
             post.transform.rotation = beltRot;
-            post.transform.position = insCenter + Vector3.up * 0.22f + beltRot * new Vector3(0f, 0f, s * 0.33f);
+            post.transform.position = insCenter + Vector3.up * 0.16f + beltRot * new Vector3(0f, 0f, s * 0.33f);
             post.GetComponent<Renderer>().material = MakeMaterial(new Color(0.3f, 0.32f, 0.36f));
             Destroy(post.GetComponent<Collider>());
         }
@@ -115,7 +117,7 @@ public class FactoryDemoBootstrap : MonoBehaviour
         scan.name = "ScanLight"; scan.transform.SetParent(root, false);
         scan.transform.localScale = new Vector3(0.05f, 0.02f, 0.66f);
         scan.transform.rotation = beltRot;
-        scan.transform.position = insCenter + Vector3.up * 0.38f;
+        scan.transform.position = insCenter + Vector3.up * 0.42f;
         var scanMat = MakeMaterial(new Color(1f, 0.25f, 0.2f));
         if (scanMat.HasProperty("_EmissionColor")) { scanMat.EnableKeyword("_EMISSION"); scanMat.SetColor("_EmissionColor", new Color(1f, 0.15f, 0.1f) * 2.5f); }
         scan.GetComponent<Renderer>().material = scanMat;
@@ -202,6 +204,14 @@ public class FactoryDemoBootstrap : MonoBehaviour
         armBody.GetComponent<Renderer>().material = MakeMaterial(new Color(0.86f, 0.62f, 0.1f));
         Destroy(armBody.GetComponent<Collider>());
 
+        var armStand = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        armStand.name = "ArmStand"; armStand.transform.SetParent(armRoot, false);
+        float standH = Mathf.Max(0.2f, center.y + 0.12f);   // reach from the arm down to the floor
+        armStand.transform.localScale = new Vector3(0.10f, standH, 0.12f);
+        armStand.transform.localPosition = new Vector3(0f, -standH * 0.5f, -0.12f);
+        armStand.GetComponent<Renderer>().material = MakeMaterial(new Color(0.3f, 0.31f, 0.35f));
+        Destroy(armStand.GetComponent<Collider>());
+
         var armPiston = GameObject.CreatePrimitive(PrimitiveType.Cube);
         armPiston.name = "Piston"; armPiston.transform.SetParent(armRoot, false);
         armPiston.transform.localScale = new Vector3(0.09f, 0.09f, 0.20f);
@@ -230,8 +240,9 @@ public class FactoryDemoBootstrap : MonoBehaviour
 
     // Instantiate the real conveyor model and fit it to the bottle path: orient
     // its longest side along the belt, scale it to beltLength and drop it so the
-    // belt surface sits at beltHeight, centred on the belt.
-    static void FitConveyor(GameObject prefab, Transform parent, Vector3 center, float beltLength, float beltHeight)
+    // frame sits at beltHeight. Returns the world height of the belt surface so
+    // products and the scanner ride on the belt instead of the frame top.
+    static float FitConveyor(GameObject prefab, Transform parent, Vector3 center, float beltLength, float beltHeight)
     {
         var go = Object.Instantiate(prefab);
         go.name = "Conveyor";
@@ -245,6 +256,21 @@ public class FactoryDemoBootstrap : MonoBehaviour
         go.transform.position += new Vector3(center.x - b.center.x, beltHeight - b.max.y, center.z - b.center.z);
 
         foreach (var c in go.GetComponentsInChildren<Collider>()) Object.Destroy(c);
+        return BeltSurfaceY(go, beltHeight);
+    }
+
+    // The belt mesh child is named "conveyorA/B/C" (chains are "chain*"); its top
+    // face is the ride surface. Falls back to a given height if not found.
+    static float BeltSurfaceY(GameObject go, float fallback)
+    {
+        Renderer best = null; float bestArea = 0f;
+        foreach (var r in go.GetComponentsInChildren<Renderer>())
+        {
+            if (!r.gameObject.name.ToLowerInvariant().StartsWith("conveyor")) continue;
+            float area = r.bounds.size.x * r.bounds.size.z;
+            if (area > bestArea) { bestArea = area; best = r; }
+        }
+        return best ? best.bounds.max.y : fallback;
     }
 
     static Bounds WorldBounds(GameObject go)
